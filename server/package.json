@@ -115,5 +115,8 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": ""
+  "description": "",
+  "devDependencies": {
+    "prettier-plugin-prisma": "^5.0.0"
+  }
 }
