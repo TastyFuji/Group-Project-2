@@ -9,36 +9,106 @@ datasource db {
 
 model User {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  customId  Int      @unique
   email     String   @unique
   password  String?
   name      String?
   role      String   @default("user")
   enabled   Boolean  @default(true)
   address   String?
-  phone     String?
+  orders    Order[]
+  carts     Cart[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
 model Product {
-  id          String  @id @default(auto()) @map("_id") @db.ObjectId
+  id          String           @id @default(auto()) @map("_id") @db.ObjectId
+  customId    Int              @unique
   title       String
   description String?
-  price       String
-  sold        String  @default("0")
-  stock       String
+  price       Float
+  sold        Int              @default(0)
+  quantity    Int
+  orderItems  ProductOnOrder[]
+  cartItems   ProductOnCart[]
+  images      Image[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  Category    Category?        @relation(fields: [categoryId], references: [customId])
+  categoryId  Int?
 }
 
 model Order {
-  id          String   @id @default(auto()) @map("_id") @db.ObjectId
-  cartTotal   String
-  orderStatus String   @default("Not Process")
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id          String           @id @default(auto()) @map("_id") @db.ObjectId
+  customId    Int              @unique
+  products    ProductOnOrder[]
+  cartTotal   Float
+  orderStatus String           @default("Not Process")
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  orderedBy   User             @relation(fields: [orderedById], references: [customId])
+  orderedById Int
+}
+
+model Counter {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  name      String   @unique // แทนที่ `id` เดิม
+  sequence  Int
+  updatedAt DateTime @updatedAt
+}
+
+model ProductOnOrder {
+  id        String  @id @default(auto()) @map("_id") @db.ObjectId
+  customId  Int     @unique
+  product   Product @relation(fields: [productId], references: [customId], onDelete: Cascade)
+  productId Int
+  order     Order   @relation(fields: [orderId], references: [customId], onDelete: Cascade)
+  orderId   Int
+  count     Int
+  price     Float
 }
 
 model Category {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
+  customId  Int       @unique
   name      String
-  updatedAt DateTime @updatedAt
+  products  Product[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Cart {
+  id          String          @id @default(auto()) @map("_id") @db.ObjectId
+  customId    Int             @unique
+  products    ProductOnCart[]
+  cartTotal   Float
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  orderedBy   User            @relation(fields: [orderedById], references: [customId])
+  orderedById Int
+}
+
+model ProductOnCart {
+  id        String  @id @default(auto()) @map("_id") @db.ObjectId
+  customId  Int     @unique
+  cart      Cart    @relation(fields: [cartId], references: [customId])
+  cartId    Int
+  product   Product @relation(fields: [productId], references: [customId], onDelete: Cascade)
+  productId Int
+  count     Int
+  price     Float
+}
+
+model Image {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  customId   Int      @unique
+  asset_id   String
+  public_id  String
+  url        String
+  secure_url String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  product    Product  @relation(fields: [productId], references: [customId], onDelete: Cascade)
+  productId  Int
 }
