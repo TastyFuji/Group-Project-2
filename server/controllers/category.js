@@ -1,54 +1,55 @@
 const prisma = require("../config/prisma");
-const getNextCustomId = require("../Other/CustomId");
 
+// สร้าง Category
 exports.create = async (req, res) => {
   try {
-    const customId = await getNextCustomId("Category", prisma);
     const { name } = req.body;
+
+    if (!name || typeof name !== "string") {
+      return res.status(400).json({ message: "Category name is required!" });
+    }
+
     const category = await prisma.category.create({
       data: {
-        customId: customId,
-        name: name,
+        name: name.trim(),
       },
     });
 
-    res.send(category);
+    res.status(201).json(category);
   } catch (err) {
-    console.log(err);
+    console.error("Error creating category:", err);
     res.status(500).json({ message: "Server Error" });
   }
 };
+
+// ดึงข้อมูล Category ทั้งหมด
 exports.list = async (req, res) => {
   try {
-    const category = await prisma.category.findMany();
-
-    res.send(category);
+    const categories = await prisma.category.findMany();
+    res.status(200).json(categories);
   } catch (err) {
-    console.log(err);
+    console.error("Error fetching categories:", err);
     res.status(500).json({ message: "Server Error" });
   }
 };
+
+// ลบ Category ตาม id
 exports.remove = async (req, res) => {
   try {
-    const { customId } = req.params;
+    const { id } = req.params;
 
-    if (!customId) {
-      return res.status(400).json({ message: "customId is required!" });
+    if (!id || typeof id !== "string") {
+      return res.status(400).json({ message: "Invalid ID provided!" });
     }
 
-    const parsedCustomId = parseInt(customId, 10);
-    if (isNaN(parsedCustomId)) {
-      return res.status(400).json({ message: "Invalid customId provided!" });
-    }
-
-    // ลบ Category
-    const category = await prisma.category.delete({
-      where: { customId: parsedCustomId },
+    const deletedCategory = await prisma.category.delete({
+      where: { id },
     });
 
-    res
-      .status(200)
-      .json({ message: "Category deleted successfully!", category });
+    res.status(200).json({
+      message: "Category deleted successfully!",
+      deletedCategory,
+    });
   } catch (err) {
     console.error("Error deleting category:", err);
     res.status(500).json({ message: "Server Error" });

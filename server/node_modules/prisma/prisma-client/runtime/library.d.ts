@@ -1165,25 +1165,17 @@ declare type EngineEventType = QueryEventType | LogEventType;
 declare type EngineProtocol = 'graphql' | 'json';
 
 declare type EngineSpan = {
-    span: boolean;
+    id: EngineSpanId;
+    parentId: string | null;
     name: string;
-    trace_id: string;
-    span_id: string;
-    parent_span_id: string;
-    start_time: [number, number];
-    end_time: [number, number];
-    attributes?: Record<string, string>;
-    links?: {
-        trace_id: string;
-        span_id: string;
-    }[];
+    startTime: HrTime;
+    endTime: HrTime;
     kind: EngineSpanKind;
+    attributes?: Record<string, unknown>;
+    links?: EngineSpanId[];
 };
 
-declare type EngineSpanEvent = {
-    span: boolean;
-    spans: EngineSpan[];
-};
+declare type EngineSpanId = string;
 
 declare type EngineSpanKind = 'client' | 'internal';
 
@@ -1752,6 +1744,8 @@ declare type HandleErrorParams = {
     globalOmit?: GlobalOmitOptions;
 };
 
+declare type HrTime = [number, number];
+
 /**
  * Defines High-Resolution Time.
  *
@@ -1764,7 +1758,7 @@ declare type HandleErrorParams = {
  * HrTime[1] = Number((1609504210.150 - HrTime[0]).toFixed(9)) * 1e9 = 150000000.
  * This is represented in HrTime format as [1609504210, 150000000].
  */
-declare type HrTime = [number, number];
+declare type HrTime_2 = [number, number];
 
 /**
  * Matches a JSON array.
@@ -2537,8 +2531,8 @@ declare type QueryEngineConfig = {
     datasourceOverrides: Record<string, string>;
     env: Record<string, string | undefined>;
     logLevel: QueryEngineLogLevel;
-    telemetry?: QueryEngineTelemetry;
     engineProtocol: EngineProtocol;
+    enableTracing: boolean;
 };
 
 declare interface QueryEngineConstructor {
@@ -2546,20 +2540,20 @@ declare interface QueryEngineConstructor {
 }
 
 declare type QueryEngineInstance = {
-    connect(headers: string): Promise<void>;
-    disconnect(headers: string): Promise<void>;
+    connect(headers: string, requestId: string): Promise<void>;
+    disconnect(headers: string, requestId: string): Promise<void>;
     /**
      * @param requestStr JSON.stringified `QueryEngineRequest | QueryEngineBatchRequest`
      * @param headersStr JSON.stringified `QueryEngineRequestHeaders`
      */
-    query(requestStr: string, headersStr: string, transactionId?: string): Promise<string>;
-    sdlSchema(): Promise<string>;
-    dmmf(traceparent: string): Promise<string>;
-    startTransaction(options: string, traceHeaders: string): Promise<string>;
-    commitTransaction(id: string, traceHeaders: string): Promise<string>;
-    rollbackTransaction(id: string, traceHeaders: string): Promise<string>;
-    metrics(options: string): Promise<string>;
-    applyPendingMigrations(): Promise<void>;
+    query(requestStr: string, headersStr: string, transactionId: string | undefined, requestId: string): Promise<string>;
+    sdlSchema?(): Promise<string>;
+    startTransaction(options: string, traceHeaders: string, requestId: string): Promise<string>;
+    commitTransaction(id: string, traceHeaders: string, requestId: string): Promise<string>;
+    rollbackTransaction(id: string, traceHeaders: string, requestId: string): Promise<string>;
+    metrics?(options: string): Promise<string>;
+    applyPendingMigrations?(): Promise<void>;
+    trace(requestId: string): Promise<string | null>;
 };
 
 declare type QueryEngineLogLevel = 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'off';
@@ -2571,11 +2565,6 @@ declare type QueryEngineRequest = {
 
 declare type QueryEngineResultData<T> = {
     data: T;
-};
-
-declare type QueryEngineTelemetry = {
-    enabled: Boolean;
-    endpoint: string;
 };
 
 declare type QueryEvent = {
@@ -3161,7 +3150,7 @@ export declare function sqltag(strings: readonly string[], ...values: readonly R
  *
  * hrtime, epoch milliseconds, performance.now() or Date
  */
-declare type TimeInput = HrTime | number | Date;
+declare type TimeInput = HrTime_2 | number | Date;
 
 export declare type ToTuple<T> = T extends any[] ? T : [T];
 
@@ -3206,7 +3195,7 @@ declare interface TraceState {
 declare interface TracingHelper {
     isEnabled(): boolean;
     getTraceParent(context?: Context): string;
-    createEngineSpan(engineSpanEvent: EngineSpanEvent): void;
+    dispatchEngineSpans(spans: EngineSpan[]): void;
     getActiveContext(): Context | undefined;
     runInChildSpan<R>(nameOrOptions: string | ExtendedSpanOptions, callback: SpanCallback<R>): R;
 }

@@ -1,7 +1,6 @@
 const prisma = require("../config/prisma");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const getNextCustomId = require("../Other/CustomId");
 
 // ฟังก์ชัน register
 exports.register = async (req, res) => {
@@ -23,16 +22,12 @@ exports.register = async (req, res) => {
       return res.status(400).json({ message: "Email already exists!" });
     }
 
-    // Generate customId
-    const customId = await getNextCustomId("User", prisma);
-
     // Hash password
     const hashPassword = await bcrypt.hash(password, 10);
 
     // Create new user
     const newUser = await prisma.user.create({
       data: {
-        customId,
         email: email,
         password: hashPassword,
       },
@@ -73,7 +68,6 @@ exports.login = async (req, res) => {
     //create payload
     const payload = {
       id: user.id,
-      cid: user.customId,
       email: user.email,
       role: user.role,
     };

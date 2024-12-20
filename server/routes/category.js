@@ -4,6 +4,6 @@ const { create, list, remove } = require("../controllers/category");
 
 router.post("/category", create);
 router.get("/category", list);
-router.delete("/category/:customId", remove);
+router.delete("/category/:id", remove);
 
 module.exports = router;

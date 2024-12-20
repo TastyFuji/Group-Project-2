@@ -1,9 +1,7 @@
 const prisma = require("../config/prisma");
-const getNextCustomId = require("../Other/CustomId");
 
 exports.create = async (req, res) => {
   try {
-    const customId = await getNextCustomId("Product", prisma);
     const {
       title,
       description,
@@ -16,12 +14,11 @@ exports.create = async (req, res) => {
     // ตรวจสอบค่า images ถ้าเป็นค่าว่าง ให้ใส่ข้อมูลแบบไม่ส่งไปยัง Prisma
     const product = await prisma.product.create({
       data: {
-        customId: customId,
         title: title,
         description: description,
         price: parseFloat(price),
         quantity: parseInt(quantity),
-        categoryId: parseInt(categoryId),
+        categoryId: categoryId,
         ...(images.length > 0 && {
           images: {
             create: images.map((item) => ({
@@ -48,7 +45,7 @@ exports.list = async (req, res) => {
       take: parseInt(count),
       orderBy: { createdAt: "desc" },
       include: {
-        Category: true,
+        category: true,
         images: true,
       },
     });
@@ -63,18 +60,13 @@ exports.list = async (req, res) => {
 };
 exports.read = async (req, res) => {
   try {
-    const parsedCustomId = parseInt(req.params.customId, 10);
-    if (isNaN(parsedCustomId)) {
-      return res.status(400).json({ message: "Invalid customId provided!" });
-    }
+    const { id } = req.params;
 
-    const product = await prisma.product.findFirst({
-      where: {
-        customId: parsedCustomId,
-      },
+    const product = await prisma.product.findUnique({
+      where: { id },
       include: {
-        Category: true, // ตรวจสอบ schema.prisma ว่า Category ถูกต้องหรือไม่
-        images: true, // ต้องเป็น `images` ถ้าตรงกับ schema.prisma
+        category: true,
+        images: true,
       },
     });
 
@@ -91,13 +83,7 @@ exports.read = async (req, res) => {
 
 exports.update = async (req, res) => {
   try {
-    const { customId } = req.params;
-    const parsedCustomId = parseInt(customId, 10);
-
-    if (isNaN(parsedCustomId)) {
-      return res.status(400).json({ message: "Invalid customId provided!" });
-    }
-
+    const { id } = req.params;
     const {
       title,
       description,
@@ -108,17 +94,17 @@ exports.update = async (req, res) => {
     } = req.body;
 
     await prisma.image.deleteMany({
-      where: { productId: parsedCustomId },
+      where: { productId: id },
     });
 
     const product = await prisma.product.update({
-      where: { customId: parsedCustomId },
+      where: { id },
       data: {
         title,
         description,
         price: parseFloat(price),
         quantity: parseInt(quantity),
-        categoryId: parseInt(categoryId),
+        categoryId: categoryId || null,
         ...(images.length > 0 && {
           images: {
             create: images.map((item) => ({
@@ -144,11 +130,10 @@ exports.update = async (req, res) => {
 
 exports.remove = async (req, res) => {
   try {
-    const { customId } = req.params;
+    const { id } = req.params;
+
     await prisma.product.delete({
-      where: {
-        customId: Number(customId),
-      },
+      where: { id },
     });
 
     res.send("Delete success!");
@@ -163,7 +148,7 @@ exports.listby = async (req, res) => {
     const products = await prisma.product.findMany({
       take: limit,
       orderBy: { [sort]: order },
-      include: { Category: true },
+      include: { category: true },
     });
     console.log(sort, order, limit);
     res.send(products);
@@ -183,7 +168,7 @@ const handleQuery = async (req, res, query) => {
         },
       },
       include: {
-        Category: true,
+        category: true,
         images: true,
       },
     });
@@ -202,7 +187,7 @@ const handleCategory = async (categoryIds) => {
         },
       },
       include: {
-        Category: true,
+        category: true,
         images: true,
       },
     });
@@ -226,7 +211,7 @@ const handlePrice = async (priceRange) => {
       },
     },
     include: {
-      Category: true,
+      category: true,
       images: true,
     },
   });
@@ -252,9 +237,7 @@ exports.searchFilters = async (req, res) => {
       console.log("Category Products Found:", categoryProducts);
 
       products = products.length
-        ? products.filter((p) =>
-            categoryProducts.some((cp) => cp.customId === p.customId),
-          )
+        ? products.filter((p) => categoryProducts.some((cp) => cp.id === p.id))
         : categoryProducts;
     }
 

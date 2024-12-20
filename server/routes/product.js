@@ -15,9 +15,9 @@ const {
 //Endpoint
 router.post("/product", create); //create
 router.get("/products/:count", list); //list
-router.get("/product/:customId", read); //read
-router.put("/product/:customId", update); //update
-router.delete("/product/:customId", remove); //remove
+router.get("/product/:id", read); //read
+router.put("/product/:id", update); //update
+router.delete("/product/:id", remove); //remove
 router.post("/productby", listby); //listby
 router.post("/search/filters", searchFilters); //searchFilters
 
