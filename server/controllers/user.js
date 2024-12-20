@@ -1,3 +1,4 @@
+const { message } = require("statuses");
 const prisma = require("../config/prisma");
 
 // แสดงรายการผู้ใช้
@@ -136,15 +137,154 @@ exports.getUserCart = async (req, res) => {
       },
     });
 
-    console.log(cart);
-    res.send(cart);
+    // ตรวจสอบว่ามีตะกร้าสินค้าหรือไม่
+    if (!cart || !cart.products || cart.products.length === 0) {
+      return res.status(404).json({ message: "Your cart is empty!" });
+    }
+
+    res.json({
+      products: cart.products,
+      cartTotal: cart.cartTotal,
+    });
   } catch (error) {
-    console.error("Error creating user cart:", error);
+    console.error("Error fetching user cart:", error);
     res.status(500).json({ message: "Server Error" });
   }
 };
 
-exports.emptyCart = async (req, res) => res.send("Hello EmptyCart");
-exports.saveAddress = async (req, res) => res.send("Hello SaveAddress");
-exports.saveOrder = async (req, res) => res.send("Hello SaveOrder");
-exports.getOrder = async (req, res) => res.send("Hello GetOrder");
+exports.emptyCart = async (req, res) => {
+  try {
+    const cart = await prisma.cart.findFirst({
+      where: {
+        orderedById: req.user.id,
+      },
+    });
+
+    if (!cart) {
+      return res.status(400).json({ message: "No cart" });
+    }
+
+    await prisma.productOnCart.deleteMany({
+      where: {
+        cartId: cart.id,
+      },
+    });
+
+    const result = await prisma.cart.deleteMany({
+      where: { orderedById: req.user.id },
+    });
+
+    console.log(result);
+    res.json({ message: "Cart empty success!", deletedCount: result.count });
+  } catch (error) {
+    console.error("Error emptying user cart:", error);
+    res.status(500).json({ message: "Server Error" });
+  }
+};
+exports.saveAddress = async (req, res) => {
+  try {
+    const { address } = req.body;
+
+    console.log(address);
+    const addressUser = await prisma.user.update({
+      where: {
+        id: req.user.id,
+      },
+      data: {
+        address: address,
+      },
+    });
+    res.json({ ok: true, message: "Update success" });
+  } catch (error) {
+    console.error("Error saveAddress:", error);
+    res.status(500).json({ message: "Server Error" });
+  }
+};
+exports.saveOrder = async (req, res) => {
+  try {
+    //step 1 get user cart
+    const userCart = await prisma.cart.findFirst({
+      where: { orderedById: req.user.id },
+      include: {
+        products: true,
+      },
+    });
+    //check empty
+    if (!userCart || userCart.products.length === 0) {
+      return res.status(400).json({ ok: false, message: "Cart is empty!" });
+    }
+
+    //check quantity
+    for (const item of userCart.products) {
+      const product = await prisma.product.findUnique({
+        where: { id: item.productId },
+        select: { quantity: true, title: true },
+      });
+      console.log(item);
+      console.log(product);
+      if (!product || item.count > product.quantity) {
+        return res.status(400).json({
+          ok: false,
+          message: `ขออภัย. สินค้า ${product?.title || "product"} ไม่พอต่อความต้องการ.`,
+        });
+      }
+    }
+
+    //create a new Order
+    const order = await prisma.order.create({
+      data: {
+        products: {
+          create: userCart.products.map((item) => ({
+            productId: item.productId,
+            count: item.count,
+            price: item.price,
+          })),
+        },
+        orderedBy: {
+          connect: { id: req.user.id, email: req.user.email },
+        },
+        cartTotal: userCart.cartTotal,
+      },
+    });
+
+    //update product
+    const update = userCart.products.map((item) => ({
+      where: { id: item.productId },
+      data: {
+        quantity: { decrement: item.count },
+        sold: { increment: item.count },
+      },
+    }));
+    console.log(update);
+
+    await Promise.all(update.map((updated) => prisma.product.update(updated)));
+    await prisma.cart.deleteMany({
+      where: { orderedById: req.user.id },
+    });
+
+    res.json({ ok: true, order });
+  } catch (error) {
+    console.error("Error saveOrder:", error);
+    res.status(500).json({ message: "Server Error" });
+  }
+};
+exports.getOrder = async (req, res) => {
+  try {
+    const orders = await prisma.order.findMany({
+      where: { orderedById: req.user.id },
+      include: {
+        products: {
+          include: { product: true },
+        },
+      },
+    });
+    if (orders.length === 0) {
+      return res.status(400).json({ ok: false, message: "No orders" });
+    }
+    //console.log(orders);
+    res.json({ ok: true, orders });
+  } catch (error) {
+    console.error("Error getOrder:", error);
+    res.status(500).json({ message: "Server Error" });
+  }
+};

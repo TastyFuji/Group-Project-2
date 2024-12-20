@@ -43,7 +43,7 @@ model Order {
   cartTotal       Float
   orderStatus     String           @default("Not Process")
   stripePaymentId String?
-  amount          Float?
+  amount          Int?
   currency        String?
   status          String?
   createdAt       DateTime         @default(now())
